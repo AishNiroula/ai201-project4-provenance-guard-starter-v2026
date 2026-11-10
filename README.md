@@ -1,9 +1,8 @@
 # Provenance Guard
 
-> ### 👋 Start here
+Finished milestone 1
 >
-> **New to this repo? Read [RUNNING.md](RUNNING.md) first.**
->
+> 
 > Once `python test.py` passes, in one terminal:
 >
 > ```bash
