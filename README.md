@@ -158,16 +158,15 @@ $ curl "http://127.0.0.1:5000/log?limit=3"
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* How to finish the whole project quickly from my Mac terminal with as little manual work as possible, then step-by-step help on parts I didn't understand (what Claude Code is, where to write and commit criteria.md).
+- *What came back:* A plan to set up the repo, use Claude Code with a detailed prompt to build the service, and write and commit my criteria first so the commit order shows they came before my results. It also gave me a command block that writes criteria.md and commits it.
+- *What I changed:* The first time I only ran commands that displayed the file, so nothing changed. I noticed criteria.md was still the empty template, said so, and got a corrected block that matched the template's format. I ran that and confirmed the new commit with git log.
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
-
+- *What I asked for:* I didn't know what numbers to pick for my acceptance criteria, so I asked for suggested targets and the reasoning behind each.
+- *What came back:* Suggested targets of at most 1 false positive in 10, an average score gap of at least 0.3, a 5,000-character input limit, and 100% for appeals, with a one-sentence reason for each.
+- *What I changed:* I kept the suggested numbers after checking that each one was specific and testable. I also had the criteria reworded to match my repo's template, including that targets must hold across all three trials.
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
 ---
