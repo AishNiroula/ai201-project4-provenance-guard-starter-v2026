@@ -222,32 +222,35 @@ def submit():
 
 @app.post("/appeal")
 def appeal():
-    """
-    A writer says you got it wrong. ← TODO — Milestone 5
+    """A writer says we got it wrong. Record it and move the item to review."""
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    content_id = payload.get("content_id")
+    reasoning = payload.get("reasoning")
 
-    Expects JSON:
-        {"content_id": "...", "reasoning": "..."}
+    if not isinstance(content_id, str) or not content_id.strip():
+        return jsonify({"error": "missing_content_id",
+                        "message": "Please send the content_id you are appealing."}), 400
+    if not isinstance(reasoning, str) or not reasoning.strip():
+        return jsonify({"error": "missing_reasoning",
+                        "message": "Please tell us why you think this is wrong."}), 400
 
-    Should:
-      1. Check the content_id actually exists — `audit.entries_for(id)` tells
-         you. A typo here fails silently and looks like a broken endpoint,
-         which is the single most common way this milestone eats an hour.
-      2. Record the appeal with `audit.log_appeal(...)`, which moves the item
-         to `under_review`.
-      3. Confirm to the writer. No automatic re-checking needed.
+    history = audit.entries_for(content_id.strip())
+    if not history:
+        return jsonify({"error": "unknown_content_id",
+                        "message": "We couldn't find that submission."}), 404
 
-    This is the smallest endpoint in the project and the one that matters most
-    to the person on the other end. It's the only thing standing between a
-    wrong accusation and nothing at all.
-    """
-    payload = request.get_json(silent=True) or {}
-
-    # TODO: delete this and build the route.
+    audit.log_appeal(
+        content_id=content_id.strip(),
+        creator_id=history[0].get("creator_id", "unknown"),
+        reasoning=reasoning.strip(),
+    )
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /appeal isn't built yet — see the TODO in app.py.",
-        "you_sent": payload,
-    }), 501
+        "content_id": content_id.strip(),
+        "status": "under_review",
+        "message": "Thank you. Your appeal has been recorded and a person will review it.",
+    })
 
 
 # ── Already works ─────────────────────────────────────────────────────────────
