@@ -72,7 +72,7 @@ WEIGHT_STYLE_SIGNAL = 0.5
 # that decide who pays for it.
 
 HUMAN_THRESHOLD = 0.35
-AI_THRESHOLD = 0.70
+AI_THRESHOLD = 0.69
 
 # ⚠️ One thing that catches people out in Milestone 5. A weighted average can
 # only land between its two inputs — so while `style_signal` is still the stub
@@ -113,7 +113,7 @@ RESULTS_DIR = ROOT / "results"
 # ─── Combining rule and input limits (unit 7) ────────────────────────────────
 # If the two signals differ by this much or more, the combined score is pulled
 # toward 0.5 ("unsure"). Two methods disagreeing IS uncertainty.
-DISAGREEMENT_GAP = 0.35
+DISAGREEMENT_GAP = 0.45
 DISAGREEMENT_SHRINK = 0.4   # keep 40% of the distance from 0.5
 
 # Longest text /submit accepts; longer gets a 400.
