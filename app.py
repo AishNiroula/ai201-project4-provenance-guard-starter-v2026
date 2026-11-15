@@ -24,6 +24,7 @@ Routes:
     GET  /health      is the service up, and is the model loaded
 """
 
+import time
 import uuid
 
 from flask import Flask, jsonify, request
@@ -153,63 +154,70 @@ def health():
 @app.post("/submit")
 # @limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
 def submit():
-    """
-    Take a piece of text, decide about it, log the decision, answer.
-    ← TODO — Milestones 3, 4 and 5
+    """Take text, score it with two signals, log the decision, answer."""
+    started = time.perf_counter()
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    text = payload.get("text")
+    creator_id = payload.get("creator_id")
 
-    Expects JSON:
-        {"text": "...", "creator_id": "..."}
+    def reject(reason, message, status=400):
+        who = creator_id if isinstance(creator_id, str) and creator_id.strip() else "unknown"
+        audit.log_rejection(creator_id=who, reason=reason)
+        return jsonify({"error": reason, "message": message}), status
 
-    Should return JSON with, at minimum:
-        {"content_id": "...", "guess": "...", "confidence": 0.0, "label": "...",
-         "model_score": 0.0, "style_score": 0.0}
+    if not isinstance(text, str) or not text.strip():
+        return reject("missing_text", "Please send some text to check.")
+    if len(text) > config.MAX_TEXT_CHARS:
+        return reject(
+            "text_too_long",
+            f"Text is over the {config.MAX_TEXT_CHARS}-character limit.",
+        )
+    if not isinstance(creator_id, str) or not creator_id.strip():
+        return reject("missing_creator_id", "Please send a creator_id.")
 
-    ⚠️ **Both signal scores go in the response, not just the log.** Unit 8's
-    `run_attacks.py` and `run_eval.py` read `model_score` and `style_score`
-    straight off this response and put them in your reports. Leave them out and
-    every row of next unit's evidence says `null` — which is exactly the
-    diagnostic you need to name a stage and a mechanism. You do not want to
-    find that out after running the attack set.
+    import detector
+    import scoring
+    import stylometry
 
-    ─────────────────────────────────────────────────────────────────────────
-    Build it in three passes. Do not skip ahead — the ordering is how you tell
-    a broken route from a broken signal.
+    try:
+        model_score = detector.model_signal(text)
+    except Exception:
+        return reject(
+            "detector_failed",
+            "We couldn't check this right now. Please try again.",
+            503,
+        )
+    style_score = stylometry.style_signal(text)
+    combined = scoring.combine_signals(model_score, style_score)
+    guess, label = scoring.score_to_label(combined)
 
-    **Milestone 3 — the route answers.**
-      1. Return a hardcoded response. Confirm `curl` gets it back before you
-         add any logic at all.
-      2. Then pull `text` and `creator_id` out of the payload.
-      3. Then call ONE signal — `detector.model_signal(text)` — and put the
-         real number in. Leave confidence and label as placeholders.
-      4. Log every submission with `audit.log_decision(...)`. The content_id
-         matters: `/appeal` needs it, and a student who skips it rebuilds this
-         whole flow later.
+    content_id = uuid.uuid4().hex[:12]
+    duration_ms = round((time.perf_counter() - started) * 1000)
 
-    **Milestone 4 — the second signal and the score.**
-      5. Add `stylometry.style_signal(text)`.
-      6. Combine them with `scoring.combine_signals(...)`.
-      7. Log BOTH signal scores alongside the combined one, and put them in the
-         response too. Next unit you can't diagnose anything without them.
+    audit.log_decision(
+        content_id=content_id,
+        creator_id=creator_id,
+        guess=guess,
+        model_score=round(model_score, 4),
+        style_score=round(style_score, 4),
+        combined_score=combined,
+        label=label,
+        status="decided",
+        text_length=len(text),
+        duration_ms=duration_ms,
+    )
 
-    **Milestone 5 — the label.**
-      8. `scoring.score_to_label(...)` and put the real label in the response.
-
-    ─────────────────────────────────────────────────────────────────────────
-    Worth deciding early, because unit 8's attack set will decide it for you:
-    what should this do when `text` is missing, empty, or enormous? A crash on
-    a malformed input is one of the most common real failures there is.
-    """
-    payload = request.get_json(silent=True) or {}
-
-    # TODO: delete this and build the route.
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /submit isn't built yet — see the TODO in app.py.",
-        "you_sent": {
-            "text_length": len(payload.get("text", "")),
-            "creator_id": payload.get("creator_id"),
-        },
-    }), 501
+        "content_id": content_id,
+        "guess": guess,
+        "confidence": combined,
+        "label": label,
+        "model_score": round(model_score, 4),
+        "style_score": round(style_score, 4),
+        "combined_score": combined,
+    })
 
 
 @app.post("/appeal")
