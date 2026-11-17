@@ -191,6 +191,8 @@ def submit():
         )
     style_score = stylometry.style_signal(text)
     combined = scoring.combine_signals(model_score, style_score)
+    if len(text.split()) < config.MIN_WORDS_FOR_AI and combined >= config.AI_THRESHOLD:
+        combined = round(config.AI_THRESHOLD - 0.01, 4)
     guess, label = scoring.score_to_label(combined)
 
     content_id = uuid.uuid4().hex[:12]

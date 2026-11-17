@@ -118,3 +118,7 @@ DISAGREEMENT_SHRINK = 0.4   # keep 40% of the distance from 0.5
 
 # Longest text /submit accepts; longer gets a 400.
 MAX_TEXT_CHARS = 5000
+
+# Texts shorter than this many words can't be labeled high-confidence AI:
+# too little evidence, and a wrong accusation is the expensive mistake.
+MIN_WORDS_FOR_AI = 40
