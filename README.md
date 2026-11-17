@@ -661,3 +661,15 @@ attacker_FP05 (technical documentation, still flagged)
 ---
 
 📖 **How to run this project: [RUNNING.md](RUNNING.md)**
+
+## Capstone
+
+**What This Extends**
+
+Provenance Guard, the service I built in units 7 and 8: POST /submit, POST /appeal, two signals, three labels, rate limiting and an audit log. What's new in this unit is a failure-handling layer around /submit and /appeal.
+
+**The Shape**
+
+Shape B, harden against failure. I am adding one layer that makes every failure answer in the same JSON shape and leave a timed record in logs/audit.jsonl. It has three parts that serve that one goal: text too short for the model to score gets a 400 (in unit 8, attack MF02, a single character, got a 503 because the route treated the model's "too short" error as a server failure); an unexpected crash returns a JSON 500 instead of an HTML error page and is logged; and every refused request records its HTTP status and how long it took.
+
+Out of scope: I am not adding or changing signals, weights, thresholds or labels (that was unit 8's improvement); I am not changing the rate limiter; I am not adding new endpoints such as GET /content/<id>; and I am not hosting it, because the model is about 550 MB, so this runs locally (Path B).
