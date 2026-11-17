@@ -172,16 +172,15 @@ edited AI       0.6527 0.4399 0.5463  unsure
 
 **Moment 1**
 
-- *What I asked for:* How to finish the whole project quickly from my Mac terminal with as little manual work as possible, then step-by-step help on parts I didn't understand (what Claude Code is, where to write and commit criteria.md).
-- *What came back:* A plan to set up the repo, use Claude Code with a detailed prompt to build the service, and write and commit my criteria first so the commit order shows they came before my results. It also gave me a command block that writes criteria.md and commits it.
-- *What I changed:* The first time I only ran commands that displayed the file, so nothing changed. I noticed criteria.md was still the empty template, said so, and got a corrected block that matched the template's format. I ran that and confirmed the new commit with git log.
+- *What I asked for:* I didn't know what numbers to pick for my acceptance criteria, so I asked for suggested targets and the reasoning behind each.
+- *What came back:* Suggested targets of at most 1 false positive in 10, an average score gap of at least 0.3, a 5,000-character input limit and 100% for appeals, with a one-sentence reason for each.
+- *What I changed:* I kept the numbers after checking each one was specific and testable, and had the criteria reworded to match my repo's template (including that targets must hold across all three trials). The numbers started as AI suggestions, so I'm noting that here.
 
 **Moment 2**
 
-- *What I asked for:* I didn't know what numbers to pick for my acceptance criteria, so I asked for suggested targets and the reasoning behind each.
-- *What came back:* Suggested targets of at most 1 false positive in 10, an average score gap of at least 0.3, a 5,000-character input limit, and 100% for appeals, with a one-sentence reason for each.
-- *What I changed:* I kept the suggested numbers after checking that each one was specific and testable. I also had the criteria reworded to match my repo's template, including that targets must hold across all three trials.
-<!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
+- *What I asked for:* My Claude Code login was blocked by my organization, so I had the code for the whole service written in a chat instead. I pasted my starter files (app.py, scoring.py, stylometry.py, config.py, audit.py) and asked for the style signal, the combining rule, the three labels, /submit and /appeal.
+- *What came back:* Complete replacement code for those files, in blocks I ran and committed one at a time. My first test showed a problem: my human sample scored 0.28 on average, but my disagreement rule (gap 0.35) pulled it to 0.41, so a correct "human" call came out as "unsure". My four test inputs then showed a false positive: a plain, short human text scored 0.724 and was labeled AI.
+- *What I changed:* I raised the disagreement gap to 0.45 and lowered the AI threshold from 0.70 to 0.69. For the false positive I added a rule that texts under 40 words can't get the AI label. The 40-word cutoff was chosen after seeing that one example, so it is tuned to it and is not a general fix.
 
 ---
 
