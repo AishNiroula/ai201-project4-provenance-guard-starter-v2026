@@ -285,6 +285,36 @@ def get_log():
     return jsonify({"count": len(entries), "entries": entries})
 
 
+# ── One answer shape for every failure ───────────────────────────────────────
+
+@app.errorhandler(Exception)
+def unexpected_error(exc):
+    """
+    Anything nobody planned for still answers in JSON and leaves a log record.
+
+    Without this, an unplanned crash returns an HTML error page and, on
+    /submit or /appeal, leaves no trace in the audit log.
+    """
+    from werkzeug.exceptions import HTTPException
+
+    if isinstance(exc, HTTPException):
+        status = exc.code or 500
+        reason = exc.name.lower().replace(" ", "_")
+        message = exc.description
+    else:
+        status, reason = 500, "internal_error"
+        message = "Something went wrong on our side. Please try again."
+    if request.path in ("/submit", "/appeal"):
+        audit.log_rejection(
+            creator_id="unknown",
+            reason=reason,
+            http_status=status,
+            path=request.path,
+            error_type=type(exc).__name__,
+        )
+    return jsonify({"error": reason, "message": message}), status
+
+
 def main():
     print(f"Provenance Guard on http://{config.HOST}:{config.PORT}")
     print(f"  detector model:  {config.DETECTOR_MODEL}")
