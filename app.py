@@ -24,6 +24,7 @@ Routes:
     GET  /health      is the service up, and is the model loaded
 """
 
+import hashlib
 import time
 import uuid
 
@@ -164,7 +165,13 @@ def submit():
 
     def reject(reason, message, status=400):
         who = creator_id if isinstance(creator_id, str) and creator_id.strip() else "unknown"
-        audit.log_rejection(creator_id=who, reason=reason)
+        audit.log_rejection(
+            creator_id=who,
+            reason=reason,
+            http_status=status,
+            duration_ms=round((time.perf_counter() - started) * 1000),
+            text_length=len(text) if isinstance(text, str) else None,
+        )
         return jsonify({"error": reason, "message": message}), status
 
     if not isinstance(text, str) or not text.strip():
@@ -208,6 +215,7 @@ def submit():
         label=label,
         status="decided",
         text_length=len(text),
+        text_sha256=hashlib.sha256(text.encode("utf-8")).hexdigest()[:12],
         duration_ms=duration_ms,
     )
 
