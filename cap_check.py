@@ -43,22 +43,22 @@ def force_crash():
     """Make a stage inside /submit raise an error nobody planned for."""
     def boom(*a, **k):
         raise RuntimeError("forced failure")
-    undo = []
-    for owner in (getattr(appmod, "scoring", None), appmod):
-        if owner is not None and hasattr(owner, "combine_signals"):
-            undo.append((owner, owner.combine_signals))
-            owner.combine_signals = boom
+    import scoring as scoring_mod
+    orig = scoring_mod.combine_signals
+    undo = [(scoring_mod, "combine_signals", orig)]
+    scoring_mod.combine_signals = boom
+    for k, v in list(vars(appmod).items()):
+        if v is orig:
+            undo.append((appmod, k, v))
+            setattr(appmod, k, boom)
     det = getattr(appmod, "detector", None)
     if det is not None and hasattr(det, "model_signal"):
-        undo.append((det, det.model_signal))
+        undo.append((det, "model_signal", det.model_signal))
         det.model_signal = lambda t: 0.5          # skip the slow model
-    if not any(o is not det for o, _ in undo):
-        sys.exit("could not find combine_signals in app.py or scoring.py")
-    name = "combine_signals"
 
     def restore():
-        for o, f in undo:
-            setattr(o, "model_signal" if o is det else name, f)
+        for o, n, f in undo:
+            setattr(o, n, f)
     return restore
 
 
