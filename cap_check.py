@@ -9,6 +9,7 @@ from pathlib import Path
 os.environ["AI201_RATE_LIMITS"] = "0"   # the limiter would block the 10-run timing
 import app as appmod                    # noqa: E402
 
+STRICT = "--strict" in sys.argv   # strict C3: duration_ms required on all 8 records
 label = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else "run"
 client = appmod.app.test_client()
 LOG = Path("logs/audit.jsonl")
@@ -105,10 +106,10 @@ for name, send, handler in cases:
     ok = (len(new) == 1 and r.is_json
           and find(new[0], "reason") == r.get_json().get("error")
           and find(new[0], "http_status") == r.status_code
-          and (handler or find(new[0], "duration_ms") is not None))
+          and ((handler and not STRICT) or find(new[0], "duration_ms") is not None))
     good3 += bool(ok)
     detail.append(f"- {name}: HTTP {r.status_code}, new records {len(new)}, {'ok' if ok else 'MISSING'}")
-rows.append(("3. Each refusal leaves one record with reason, status, duration",
+rows.append(("3. Each refusal leaves one record with reason, status, duration" + (" (strict: duration on all 8)" if STRICT else ""),
              "8 of 8", f"{good3}/8", good3 == 8))
 
 # 4. warm latency over 10 runs
