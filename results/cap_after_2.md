@@ -19,6 +19,6 @@
 - GET /submit (405): HTTP 405, new records 1, ok
 - forced crash (500): HTTP 500, new records 1, ok
 
-**Criterion 4 runs (seconds):** 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06
+**Criterion 4 runs (seconds):** 0.06, 0.06, 0.06, 0.06, 0.07, 0.06, 0.06, 0.06, 0.06, 0.06
 
 **Average 0.06 s per warm request; x100 requests/day = 0.1 minutes of CPU.**
