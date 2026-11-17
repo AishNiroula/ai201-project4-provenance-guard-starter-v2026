@@ -186,25 +186,19 @@ edited AI       0.6527 0.4399 0.5463  unsure
 
 ## Rate Limiting
 
-**My limits:** ___ per minute, ___ per day
+**My limits:** 10 per minute, 100 per day
 
-**Why those numbers and not others:**
-<!-- Think about two people: a real writer submitting their own work a few
-     times an hour, and a script sending a thousand variations to map your
-     thresholds. Your numbers have to be liveable for the first and hostile to
-     the second. -->
+**Why those numbers and not others:** A real writer submits a few pieces an hour, so 10 a minute is more than a person needs and never gets in their way. A script mapping my thresholds with hundreds of variations hits the minute cap within seconds, and the 100-a-day cap stops a slow, patient version of the same thing. I didn't go lower because a writer retrying after an error or submitting several drafts in a row shouldn't be locked out.
 
-**What a caller counts as:** <!-- per address, or per creator_id? They fail
-differently — one script can look like a thousand callers, and one household
-can look like one. -->
+**What a caller counts as:** The creator_id in the request body if it is a non-empty string, otherwise the caller's IP address (app.py::rate_limit_key). The weakness is that a script can rotate through creator_ids to dodge the limit, and one IP with many writers behind it can't be told apart.
 
 **The run of status codes when I pushed past it:**
 
-<!-- python run_attacks.py --flood 15 -->
-
-```
-
-```
+~~~
+$ python run_attacks.py --flood 15
+200 200 200 200 200 200 200 200 200 200 429 429 429 429 429
+5 of 15 were rate limited.
+~~~
 
 ---
 
