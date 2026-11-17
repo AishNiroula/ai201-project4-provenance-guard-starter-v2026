@@ -673,3 +673,127 @@ Provenance Guard, the service I built in units 7 and 8: POST /submit, POST /appe
 Shape B, harden against failure. I am adding one layer that makes every failure answer in the same JSON shape and leave a timed record in logs/audit.jsonl. It has three parts that serve that one goal: text too short for the model to score gets a 400 (in unit 8, attack MF02, a single character, got a 503 because the route treated the model's "too short" error as a server failure); an unexpected crash returns a JSON 500 instead of an HTML error page and is logged; and every refused request records its HTTP status and how long it took.
 
 Out of scope: I am not adding or changing signals, weights, thresholds or labels (that was unit 8's improvement); I am not changing the rate limiter; I am not adding new endpoints such as GET /content/<id>; and I am not hosting it, because the model is about 550 MB, so this runs locally (Path B).
+
+**Running It**
+
+This is Path B, run locally, because the model is about 551 MB and I did not host it. RUNNING.md has the steps: clone, create a virtual environment, `pip install -r requirements.txt`, then one command, `python app.py`. A run from a fresh clone, with Python 3.13.5, is committed as results/clean_checkout_run.txt. In it the ping answered ok, a two-sentence text came back scored (unsure), and the one-character text came back as a 400 text_too_short. The first request after starting is slower because it loads the model (2.0 s in my cost run).
+
+**Instrumentation**
+
+Every request to /submit and /appeal ends in a JSON line in logs/audit.jsonl. Decisions record the scores, the guess, the text length, a 12-character SHA-256 fingerprint of the text (so a decision can be matched to its input without storing the text) and duration_ms. Refusals record the reason, http_status and duration_ms; refusals caught by the global handler also record the path and the Python error type. Twelve entries from my audit log, covering the kinds of entry I could find, oldest first:
+
+~~~
+{"timestamp": "2026-11-17T02:34:35+00:00", "creator_id": "attacker_flood", "event": "rejected", "status": "rejected", "reason": "rate_limited", "limit": "10 per 1 minute"}
+{"timestamp": "2026-11-17T02:52:42+00:00", "creator_id": "cap_check", "event": "rejected", "status": "rejected", "reason": "detector_failed"}
+{"timestamp": "2026-11-17T03:12:54+00:00", "creator_id": "unknown", "event": "rejected", "status": "rejected", "reason": "internal_error", "http_status": 500, "path": "/submit", "error_type": "RuntimeError", "duration_ms": 62}
+{"timestamp": "2026-11-17T03:12:54+00:00", "creator_id": "unknown", "event": "rejected", "status": "rejected", "reason": "method_not_allowed", "http_status": 405, "path": "/submit", "error_type": "MethodNotAllowed", "duration_ms": 0}
+{"timestamp": "2026-11-17T03:12:54+00:00", "creator_id": "unknown", "event": "rejected", "status": "rejected", "reason": "missing_text", "http_status": 400, "duration_ms": 0, "text_length": null}
+{"timestamp": "2026-11-17T03:12:54+00:00", "creator_id": "cap_check", "event": "rejected", "status": "rejected", "reason": "text_too_short", "http_status": 400, "duration_ms": 0, "text_length": 1}
+{"timestamp": "2026-11-17T03:12:54+00:00", "creator_id": "cap_check", "event": "rejected", "status": "rejected", "reason": "text_too_long", "http_status": 400, "duration_ms": 0, "text_length": 6000}
+{"timestamp": "2026-11-17T03:12:54+00:00", "creator_id": "unknown", "event": "rejected", "status": "rejected", "reason": "missing_creator_id", "http_status": 400, "duration_ms": 0, "text_length": 289}
+{"timestamp": "2026-11-17T03:12:55+00:00", "content_id": "f169e4076551", "creator_id": "appeal_cap_redo_after_3_4", "event": "appeal", "status": "under_review", "reasoning": "I wrote this myself."}
+{"timestamp": "2026-11-17T03:12:55+00:00", "content_id": "f169e4076551", "creator_id": "appeal_cap_redo_after_3_4", "guess": "unsure", "model_score": 0.5963, "style_score": 0.5, "combined_score": 0.5482, "label": "We can't tell for sure whether this was written by a person or by AI. That isn't a finding that anything is wrong. If you wrote it yourself, you don't need to do anything, and you can ask for a review at any time.", "status": "decided", "text_length": 144, "text_sha256": "a0885153d202", "duration_ms": 55}
+{"timestamp": "2026-11-17T03:12:55+00:00", "content_id": "706492078297", "creator_id": "appeal_cap_redo_after_3_3", "event": "appeal", "status": "under_review", "reasoning": "I wrote this myself."}
+{"timestamp": "2026-11-17T03:12:55+00:00", "content_id": "706492078297", "creator_id": "appeal_cap_redo_after_3_3", "guess": "unsure", "model_score": 0.639, "style_score": 0.5, "combined_score": 0.5695, "label": "We can't tell for sure whether this was written by a person or by AI. That isn't a finding that anything is wrong. If you wrote it yourself, you don't need to do anything, and you can ask for a review at any time.", "status": "decided", "text_length": 160, "text_sha256": "7bd6b12642f2", "duration_ms": 56}
+~~~
+
+**The failed run.** I forced a stage inside /submit to raise (the check script replaces scoring.combine_signals with a function that raises RuntimeError). After the extension, the log alone says what happened: reason internal_error, http_status 500, error_type RuntimeError, path /submit, and how long it took.
+
+~~~
+{"timestamp": "2026-11-17T03:12:54+00:00", "creator_id": "unknown", "event": "rejected", "status": "rejected", "reason": "internal_error", "http_status": 500, "path": "/submit", "error_type": "RuntimeError", "duration_ms": 62}
+~~~
+
+Before the extension the same forced crash returned an HTML error page and left no record, and so did a GET to /submit: from results/cap_before_1.md, "GET /submit (405): HTTP 405, new records 0, MISSING" and "forced crash (500): HTTP 500, new records 0, MISSING". The only trace of the other old failure (a one-character text returning 503 in unit 8) is this entry, which says detector_failed and nothing about what the user did wrong:
+
+~~~
+{"timestamp": "2026-11-17T02:22:51+00:00", "creator_id": "attacker_MF02", "event": "rejected", "status": "rejected", "reason": "detector_failed"}
+~~~
+
+**What It Costs**
+
+Measured with cap_cost.py, an average over 10 warm HTTP requests to a running server (one warm-up request first, then 10 timed ones):
+
+| Measure | Value |
+|---|---|
+| Average over 10 warm HTTP requests | 0.068 s |
+| Fastest / slowest of the 10 | 0.064 s / 0.071 s |
+| Cold start: import app | 0.1 s |
+| Cold start: first request (loads the model) | 2.0 s |
+| Peak memory of a process that loaded the model | 906 MB |
+| GPT-2 weights on disk (Hugging Face cache) | 551 MB |
+| Money per request | 0 (the model runs on this machine, no API) |
+| 100 requests (the daily rate limit) | 6.8 s of compute |
+
+Runs (seconds): 0.069, 0.071, 0.068, 0.071, 0.070, 0.070, 0.067, 0.064, 0.065, 0.065
+
+One request averages 0.068 s of compute, so 100 requests (the daily limit for one creator) is about 6.8 s and 1,000 requests is about 68 s. There is no money cost per request because the model runs on my machine and no API is called; the real costs are memory (about 906 MB peak once the model is loaded) and a 2.0 s first request while it loads. A host with 1 GB of memory would be tight. The extension added no measurable time: the in-process average over 10 warm requests was 0.06, 0.06, 0.06 s per trial before and 0.07, 0.06, 0.06 s after (that check skips the network, so it reads lower than the HTTP number above).
+
+**Run Log and Verdicts**
+
+The criteria are in criteria.md, committed as "add capstone criteria" (c848b01) before any result was committed. Each was run three times before the extension (the unit 8 code, app.py from d25f1f4) and three times after:
+
+| Criterion | Target | Before (trials 1, 2, 3) | After (trials 1, 2, 3) | Verdict after |
+|---|---|---|---|---|
+| 1. Too-short inputs return 400 text_too_short | 5 of 5, 0 five-hundreds | 0/5, 5 5xx / 0/5, 5 5xx / 0/5, 5 5xx | 5/5, 0 5xx / 5/5, 0 5xx / 5/5, 0 5xx | **MET** |
+| 2. Forced crash answers JSON 500 internal_error | 10 of 10 | 0/10 / 0/10 / 0/10 | 10/10 / 10/10 / 10/10 | **MET** |
+| 3. Each refusal leaves one record with reason, status, duration | 8 of 8 | 0/8 / 0/8 / 0/8 | 8/8 / 8/8 / 8/8 | **MET** |
+| 4. Average warm /submit time over 10 runs | at most 3.0 s | 0.06 s / 0.06 s / 0.06 s | 0.07 s / 0.06 s / 0.06 s | **MET** |
+| 5. Appeals still work (check_appeals.py) | 5/5 + unknown id 404 | not run on the old code (unit 8: 5/5 in all 3 trials) | 5/5 / 5/5 / 5/5 | **MET** |
+
+Diagnoses, from the before runs: C1 failed because the route turned the detector's "too short" error into a 503 (the generic `except Exception` caught it). C2 failed because Flask answers an unplanned crash with an HTML page and nothing is logged, since the route's own error handling never saw it. C3 failed because the refusal records had no http_status, and a 405 or a crash left no record at all (0 new records for those two kinds). C4 was met on both sides, so it measured nothing: 0.06 s against a 3.0 s limit. C5 was not run on the old code; its unit 8 result was 5/5 three times.
+
+Two things about the runs themselves. C5 in the after trials ran against the server I had already started with the capstone code; the first strict run (cap_strict_after_*) shows C5 MISSED because the server was not running, which is a harness problem and not a regression. And my first strict "before" runs (cap_strict_before_*) were invalid: they ran after the improvement was already in the code (they read 8/8, as the after runs did), so I redid them from the commit before the improvement; those are the cap_redo_* files used in The Improvement.
+
+**The Improvement**
+
+**What I changed:** One change to app.py. A before_request hook records the start time, and the global error handler now writes duration_ms into its record using it. Before this, only the route's own refusals recorded duration; the 405 and the unplanned 500 did not, which is why my C3 exempted them.
+
+**Which diagnosis pointed at it:** C3. I wrote the exemption into the criterion because I knew those two records had no duration, so a passing C3 hid the gap. To measure it I added a strict mode to the check (--strict: all 8 records need duration_ms) and ran it before and after.
+
+**Run log, three trials each, before from app.py at the commit before the improvement:**
+
+| Check | Before the improvement (trials 1, 2, 3) | After the improvement (trials 1, 2, 3) |
+|---|---|---|
+| C3 strict: all 8 records carry duration_ms | 6/8 / 6/8 / 6/8 | 8/8 / 8/8 / 8/8 |
+| C1 Too-short inputs return 400 text_too_short | not re-run | 5/5, 0 5xx / 5/5, 0 5xx / 5/5, 0 5xx |
+| C2 Forced crash answers JSON 500 internal_error | not re-run | 10/10 / 10/10 / 10/10 |
+| C4 Average warm /submit time over 10 runs | not re-run | 0.06 s / 0.06 s / 0.06 s |
+| C5 Appeals still work (check_appeals.py) | not re-run | 5/5 / 5/5 / 5/5 |
+
+**Did it help, and how do I know:** It helped on what it targeted, 6/8 to 8/8 in all three trials, from logs/audit.jsonl: the 500 record now reads duration_ms 62 and the 405 record carries duration_ms 0 (a request refused before any work rounds to 0 ms, so that number says "fast", not "missing"). The other criteria were re-run in the same trials and stayed MET. The cost is two small functions and a hook that runs on every request. The caveat is that the check only proves the two handler-level kinds on /submit; I did not test /appeal.
+
+**What's Still Broken**
+
+- **C4 is too loose.** I set 3.0 s from my memory of unit 8's one-to-two-second requests and never measured first. The result is 0.068 s, so a slowdown of more than 40 times would still pass. I would set it from a measured baseline (for example 0.15 s). I did not change it because the criteria are fixed before the results.
+- **C1 to C4 run through Flask's test client, in-process.** That skips the network, the rate limiter (I switch it off for the timing) and the server process. A failure that only happens over a real connection, such as a client that disconnects mid-request, is untested. Only C5 and the cost measurement use real HTTP.
+- **C3 covers /submit only.** I did not check that the refusals from /appeal (missing fields, unknown id) leave a record with a status. I would add 3 appeal cases to the check.
+- **C1 uses five inputs.** The detector's real minimum length is unknown to me; text just above it is still too short to mean anything and gets scored.
+- **Only /submit and /appeal failures are logged.** The global handler writes a record only for those two paths, by design, so requests to other URLs leave no record.
+- **C5 checks appeals, not scoring.** The extension touched the code around the scoring path and I did not re-run the unit 8 label scenarios on it. I would add the stand-in and clearly-AI scenarios to the check.
+- **Unit 8's open problems are untouched,** as the scope says: label coverage (criterion 3) is still MISSED, FP05 is still labeled ai, and 9 of 10 evasion attacks still get through.
+
+**How I Used AI**
+
+**Moment 1**
+
+- *What I asked for:* Help choosing what to extend and which shape, building on units 7 and 8.
+- *What came back:* Shape B (harden against failure), chosen because my unit 8 attack MF02 had shown a real bug, and a scope that listed what I would not touch.
+- *What I changed:* Nothing. I kept the scope and wrote it into the README before building.
+
+**Moment 2**
+
+- *What I asked for:* The code for the three failure-handling changes and the check scripts.
+- *What came back:* Three patches to app.py and cap_check.py. The first run of cap_check.py exited with "could not find combine_signals" because the script assumed how app.py imports scoring; the assistant had not seen that file. It also told me to run cap_cost.py without giving me the file.
+- *What I changed:* I ran everything and pasted the real output back each time. The assistant fixed the script (patching scoring.combine_signals directly) and supplied the missing file; the committed before and after results are from the fixed versions.
+
+**Moment 3**
+
+- *What I asked for:* The five criteria; I asked the assistant to pick fair numbers for me.
+- *What came back:* Five criteria with targets and reasons, which I committed unchanged as "add capstone criteria" before running anything. They are the assistant's proposals and not my own judgement; the weakest, C4, turned out to be too loose.
+- *What I changed:* Nothing before the runs. I report C4's looseness above instead of editing it.
+
+**Moment 4**
+
+- *What I asked for:* The improvement, with a before and after.
+- *What came back:* A duration fix and a strict check. My first before and after runs were identical (8/8 both), which meant the "before" runs had run after the fix was already applied. I pasted the numbers, the assistant pointed out that identical before and after cannot show an improvement, and we redid the before runs from git.
+- *What I changed:* I kept the invalid runs in the repo and said so in Run Log and Verdicts, and used the redone runs as the evidence.
