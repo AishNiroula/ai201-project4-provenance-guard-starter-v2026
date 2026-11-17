@@ -18,7 +18,7 @@ def combine_signals(model_score: float, style_score: float) -> float:
       2. If the signals differ by DISAGREEMENT_GAP (0.45) or more, pull the
          result toward 0.5 by keeping only 40% of its distance from 0.5.
          Disagreement means uncertainty, so it lands in "unsure".
-      3. The AI threshold (0.69) is set further from the middle than the
+      3. The AI threshold (0.75) is set further from the middle than the
          human one (0.35), so a wrong accusation needs more evidence than a
          "human" call.
     """
