@@ -190,6 +190,11 @@ def submit():
 
     try:
         model_score = detector.model_signal(text)
+    except ValueError:
+        return reject(
+            "text_too_short",
+            "That is too short to check. Please send a few sentences.",
+        )
     except Exception:
         return reject(
             "detector_failed",
