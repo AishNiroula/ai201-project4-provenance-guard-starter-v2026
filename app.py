@@ -285,6 +285,18 @@ def get_log():
     return jsonify({"count": len(entries), "entries": entries})
 
 
+@app.before_request
+def _start_timer():
+    from flask import g
+    g.started = time.perf_counter()
+
+
+def _elapsed_ms():
+    from flask import g
+    started = getattr(g, "started", None)
+    return None if started is None else round((time.perf_counter() - started) * 1000)
+
+
 # ── One answer shape for every failure ───────────────────────────────────────
 
 @app.errorhandler(Exception)
@@ -311,6 +323,7 @@ def unexpected_error(exc):
             http_status=status,
             path=request.path,
             error_type=type(exc).__name__,
+            duration_ms=_elapsed_ms(),
         )
     return jsonify({"error": reason, "message": message}), status
 
